@@ -1,0 +1,35 @@
+name: Deploy to Vapor
+on: workflow_dispatch
+jobs:
+  deploy:
+    name: Deploy to Vapor
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v2
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '7.4'
+      - name: Validate Composer
+        run: composer validate
+      - name: Install Composer dependencies
+        run: composer install --prefer-dist --no-interaction --no-suggest --no-dev
+      - name: Install Vapor CLI
+        run: composer require laravel/vapor-cli
+      - name: Download ENV
+        run: ./vendor/bin/vapor env:pull ${{ env.APP_ENV }}
+        env:
+          APP_ENV: ${{ github.ref == 'refs/heads/master' && 'production' || 'staging' }}
+          VAPOR_API_TOKEN: ${{ secrets.VAPOR_API_TOKEN }}
+      - name: Deploy code
+        run: ./vendor/bin/vapor deploy ${{ env.APP_ENV }} --commit="${{ github.sha }}"
+        env:
+          APP_ENV: ${{ github.ref == 'refs/heads/master' && 'production' || 'staging' }}
+          VAPOR_API_TOKEN: ${{ secrets.VAPOR_API_TOKEN }}
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v2
+        if: failure()
+        with:
+          name: Logs
+          path: ./storage/logs
